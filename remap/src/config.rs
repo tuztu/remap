@@ -1,16 +1,16 @@
 use anyhow::Error;
 use once_cell::sync::OnceCell;
-use sqlx::{MySql, Pool, Arguments, Encode, Type};
-use sqlx::mysql::{MySqlArguments, MySqlRow, MySqlPoolOptions};
+use sqlx::{Arguments, Encode, MySql, Pool, Type};
+use sqlx::mysql::{MySqlArguments, MySqlRow};
 
 static POOL: OnceCell<Pool<MySql>> = OnceCell::new();
 
-pub async fn setup(pool: Pool<MySql>) -> Result<(), Error> {
+pub async fn init_pool(pool: Pool<MySql>) -> Result<(), Error> {
     // let pool = MySqlPoolOptions::new()
     //     .max_connections(5)
     //     .connect(config.conn.as_str())
     //     .await?;
-    POOL.set(pool).map_err(|_| anyhow!("Setup mysql with error."))
+    POOL.set(pool).map_err(|_| anyhow!("Failed to setup mysql pools."))
 }
 
 pub fn pool<'a>() -> &'a Pool<MySql> {
@@ -45,11 +45,38 @@ impl Args {
         self
     }
 
-    pub fn args_size(&self) -> usize {
+    pub(crate) fn args_size(&self) -> usize {
         self.args_size
     }
 
-    pub fn mysql_args(self) -> MySqlArguments {
+    pub(crate) fn mysql_args(self) -> MySqlArguments {
         self.mysql_args
     }
 }
+
+/*
+use sqlx::encode::{IsNull};
+use sqlx::mysql::{MySqlTypeInfo};
+
+/// Implementation of [`Arguments`] for MySQL.
+#[derive(Debug, Default)]
+pub struct MySqlArgument {
+    pub(crate) values: Vec<u8>,
+    pub(crate) types: Vec<MySqlTypeInfo>,
+    pub(crate) null_bitmap: Vec<u8>,
+}
+
+impl MySqlArgument {
+    pub(crate) fn add<'q, T>(&mut self, value: T) where T: Encode<'q, MySql> + Type<MySql> {
+        let index = self.types.len();
+        self.null_bitmap.resize((index / 8) + 1, 0);
+
+        let ty = value.produces().unwrap_or_else(T::type_info);
+        self.types.push(ty);
+
+        if let IsNull::Yes = value.encode(&mut self.values) {
+            self.null_bitmap[index / 8] |= (1 << (index % 8)) as u8;
+        }
+    }
+}
+*/
