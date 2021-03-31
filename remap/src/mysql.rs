@@ -45,6 +45,31 @@ pub async fn insert_tx<'a, T: Table>(v: &Vec<T>, tx: &mut Transaction<'a, MySql>
     Ok(result.rows_affected())
 }
 
+pub async fn insert_ignore_tx<'a, T: Table>(v: &Vec<T>, tx: &mut Transaction<'a, MySql>)
+    -> Result<u64, Error> {
+    let name = T::struct_name().to_snake_case();
+    let fields = T::fields_name();
+    let args = fields.iter().map(|_| "?").collect::<Vec<&str>>();
+    let mut sql_builder = SqlBuilder::insert_into(name);
+    sql_builder.fields(fields.as_slice());
+    for _ in 0..v.len() {
+        sql_builder.values(args.as_slice());
+    }
+    let sql = sql_builder.sql()?;
+    let sql = sql.replace("INSERT", "INSERT IGNORE");
+
+    let mut args = Args::new();
+    for x in v {
+        args = x.bind_args(args);
+    }
+
+    let result = sqlx::query_with(sql.as_str(), args.mysql_args())
+        .execute(tx)
+        .await?;
+
+    Ok(result.rows_affected())
+}
+
 /// insert … on duplicate key update
 /// TODO build middle type to pass the args.
 /*
@@ -76,6 +101,7 @@ pub async fn insert_update_tx<'a, T: Table>(
     Ok()
 }
 */
+
 pub async fn update<T: Table>(set_fields: &[&str], and_where_eq: &[&str], args: Args)
     -> Result<u64, Error> {
     let name = T::struct_name();
@@ -148,9 +174,14 @@ pub async fn select_in<T>(where_in: &str, args: Args) -> Result<Vec<T>, Error>
     Ok(vec)
 }
 
-/*pub async fn select<T>() -> Result<Vec<T>, Error> where T: Table {
-    Ok(vec![])
-}*/
+pub async fn select<T>(sql: &str, args: Args) -> Result<Vec<T>, Error> where T: Table {
+    let output: Vec<T> = sqlx::query_with(sql, args.mysql_args())
+        .map(|row| T::from_mysql_row(row).expect("Error map row to struct"))
+        .fetch_all(pool())
+        .await?;
+
+    Ok(output)
+}
 
 
 #[cfg(test)]

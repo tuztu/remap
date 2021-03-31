@@ -1,6 +1,6 @@
 #[macro_use]
 extern crate anyhow;
-#[macro_use]
+#[cfg_attr(test, macro_use)]
 extern crate remap_derive;
 
 pub mod mysql;
