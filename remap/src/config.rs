@@ -1,4 +1,5 @@
 use anyhow::Error;
+use heck::SnakeCase;
 use once_cell::sync::OnceCell;
 use sqlx::{Arguments, Encode, MySql, Pool, Type};
 use sqlx::mysql::{MySqlArguments, MySqlRow};
@@ -20,6 +21,9 @@ pub fn pool<'a>() -> &'a Pool<MySql> {
 
 pub trait Table: Sized + Send + Unpin {
     fn struct_name() -> String;
+    fn table_name() -> String {
+        Self::struct_name().to_snake_case()
+    }
     fn fields_name() -> Vec<String>;
     fn bind_args(&self, args: Args) -> Args;
     fn from_mysql_row(row: MySqlRow) -> Result<Self, Error>;
