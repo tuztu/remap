@@ -9,5 +9,5 @@ pub mod mysql;
 pub mod config;
 pub mod template2;
 pub mod template;
-pub mod table;
+pub mod extend;
 pub mod arguments;

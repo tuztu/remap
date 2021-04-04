@@ -19,8 +19,6 @@ pub trait MySqlTemplate<S>: Debug where S: MySqlTemplate<S> {
     async fn insert_tx<'a, T>(v: &Vec<T>, tx: &mut Transaction<'a, MySql>)
         -> Result<u64, Error>
         where T : Table + Sync {
-
-
         todo!()
     }
 
