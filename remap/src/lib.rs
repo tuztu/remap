@@ -7,7 +7,6 @@ extern crate remap_derive;
 
 pub mod mysql;
 pub mod config;
-pub mod template2;
 pub mod template;
 pub mod extend;
 pub mod arguments;

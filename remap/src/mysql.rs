@@ -209,7 +209,7 @@ mod test {
         });
     }
 
-    #[derive(Debug, Clone, Hash, Eq, PartialEq, Remap)]
+    #[derive(Debug, Clone, Hash, Eq, PartialEq, Table)]
     pub struct User {
         pub id: u64,
         pub name: String

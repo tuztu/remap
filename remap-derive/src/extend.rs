@@ -1,71 +1,108 @@
 use proc_macro::TokenStream;
 use std::str::FromStr;
 
-use quote::quote;
+use heck::SnakeCase;
+use proc_macro2::Span;
+use quote::{quote, ToTokens};
+use syn::{Ident, Lit, Meta, NestedMeta, punctuated::Punctuated};
 
-pub fn impl_table(input: TokenStream) -> TokenStream {
-    let input = syn::parse::<syn::DeriveInput>(input).unwrap();
-    let ident = &input.ident;
+pub fn derive(ast: syn::DeriveInput) -> TokenStream {
+    let (db, table) = parse_attrs(&ast);
+    let ident = ast.ident;
 
-    let fields = match input.data {
+    let fields = match ast.data {
         syn::Data::Struct(ref s) => &s.fields,
-        _ => panic!("Entity can only be derived for struct"),
+        _ => panic!("Remap can only be derived for struct"),
     };
 
-    let mut fields_name = String::new();
-    for f in fields {
-        if let Some(id) = f.ident.as_ref() {
-            if !fields_name.is_empty() { fields_name.push_str(",") }
-            fields_name.push_str(id.to_string().as_str());
+    let mut fields_str = String::new();
+    let mut fields_vec = Vec::new();
+    for field in fields {
+        if let Some(ident) = field.ident.as_ref() {
+            let name = ident.to_string();
+            let item = format!(" \"{}\", ", name);
+            fields_str.push_str(item.as_str());
+            fields_vec.push(name)
         }
     }
 
-    let fields_vec = fields.iter().filter_map(|field| {
-        field.ident.as_ref().map(|a| { a.to_string() })
-    }).collect::<Vec<String>>();
-
-    // Build bind args statement
-    let mut build_args = String::new();
+    let mut add_args_str = String::new();
     for x in &fields_vec {
-        build_args.push_str(format!(r#".bind(&self.{})"#, x).as_str());
+        add_args_str.push_str(format!(r#".add(&self.{}) "#, x).as_str());
     }
 
-    // Build from row statements.
-    let mut from_row_value = String::new();
+    let mut decode_rows_str = String::new();
     for x in &fields_vec {
-        from_row_value.push_str(format!(r#"{0}: row.try_get("{0}")?,"#, x).as_str());
+        decode_rows_str.push_str(format!(r#"{0}: row.try_get("{0}")?, "#, x).as_str());
     }
 
-    let expanded = quote! {
-        impl Table for #ident {
-            fn struct_name() -> String {
-                // "name".to_string()
-                stringify!(#ident).to_string()
-                // #struct_name.to_string()
-
+    let token = quote!(
+        impl Remap<_db_> for #ident {
+            fn table_name() -> &'static str {
+                stringify!(#table)
             }
-
-            fn fields_name() -> Vec<String> {
-                #fields_name.split(",").map(|a| a.to_string()).collect::<Vec<String>>()
+            fn fields_name() -> Vec<&'static str> {
+                vec![ _fields_str_ ]
             }
-
-            fn bind_args(&self, mut args: Args) -> Args {
-                args[build_args_holder]
+            fn fields_args(&self) -> remap::arguments::Args<_db_> {
+                remap::arguments::Args::new()_add_args_str_
             }
-
-            fn from_mysql_row(row: MySqlRow) -> Result<#ident, Error> {
-                let t = #ident {
-                    [from_row_holder]
+            fn decode_row(row: <_db_ as sqlx::Database>::Row) -> Result<Self, anyhow::Error> {
+                use sqlx::Row;
+                let x = Self {
+                    _decode_rows_str_
                 };
-                Ok(t)
+                Ok(x)
             }
         }
-    };
+    );
 
-    let expanded = expanded.to_string()
-        .replace("[build_args_holder]", build_args.as_str())
-        .replace("[from_row_holder]", from_row_value.as_str());
-    TokenStream::from_str(expanded.as_str()).unwrap()
+    let token = token.to_string()
+        .replace("_db_", db.as_str())
+        .replace("_fields_str_", fields_str.as_str())
+        .replace("_add_args_str_", add_args_str.as_str())
+        .replace("_decode_rows_str_", decode_rows_str.as_str());
 
-    // TokenStream::from(expanded)
+    // panic!("{}", token);
+
+    TokenStream::from_str(token.as_str()).expect("Parse token stream failed")
+}
+
+fn parse_attrs(ast: &syn::DeriveInput) -> (String, String) {
+    ast.attrs.iter().find_map(|attr| {
+        if let Meta::List(meta_list) = attr.parse_meta().unwrap() {
+            if meta_list.path.get_ident() ==
+                Some(&Ident::new("remap", Span::call_site())) {
+                let (db_type, table) = parse_remap(&meta_list.nested);
+                let db_type = db_type.expect("Must specify a database");
+                let table = table.unwrap_or_else(||
+                    (&ast.ident).to_string().to_snake_case());
+                return Some((db_type, table));
+            }
+        }
+        None
+    }).expect("Must specify a database")
+}
+
+fn parse_remap<P>(props: &Punctuated<NestedMeta, P>) -> (Option<String>, Option<String>) {
+    let db_type = props.iter().find_map(|item| {
+        if let NestedMeta::Meta(Meta::Path(path)) = item {
+            return Some(path.to_token_stream().to_string());
+        }
+        None
+    });
+
+    let table = props.iter().find_map(|item| {
+        if let NestedMeta::Meta(Meta::NameValue(name_value)) = item {
+            if name_value.path.get_ident() ==
+                Some(&Ident::new("table", Span::call_site())){
+                if let Lit::Str(s) = &name_value.lit {
+                    return Some(s.value());
+                }
+            }
+        }
+        None
+    });
+
+    (db_type, table)
 }
