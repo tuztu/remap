@@ -7,14 +7,17 @@ pub trait Remap<DB: sqlx::Database>: Sized + Send + Unpin {
 
 #[cfg(test)]
 mod test {
-    use crate::extend::Remap;
+    // use crate::extend::Remap;
     use crate as remap;
 
     #[test]
-    fn test() { }
+    fn test() {
+        // println!("{}", User::table_name());
+        // println!("{:?}", User::fields_name());
+    }
 
     #[derive(Debug, Remap)]
-    #[remap(sqlx::MySql)]
+    #[remap(sqlx::MySql, table = "my_user")]
     pub struct User {
         id: u32,
         name: String

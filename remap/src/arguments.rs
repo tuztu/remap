@@ -1,7 +1,8 @@
 use sqlx::{Any, Database, Encode, Mssql, MySql, Postgres, Sqlite, Type, TypeInfo};
+use sqlx::Arguments;
 use sqlx::database::HasArguments;
 use sqlx::encode::IsNull;
-use sqlx::mysql::MySqlTypeInfo;
+use sqlx::mysql::{MySqlArguments, MySqlTypeInfo};
 
 /*
 pub trait Arguments<'a, DB>: Sized where DB: Database {
@@ -50,7 +51,7 @@ impl<'a> Arguments<'a, MySql> for Args<'a, MySql> {
 */
 
 pub struct Args<'a, DB: Database> {
-    pub values: Vec<Bridge<'a, DB>>
+    pub(crate) values: Vec<Bridge<'a, DB>>
 }
 
 impl<'a, DB: Database> Args<'a, DB> {
@@ -71,7 +72,7 @@ impl<'a, DB: Database> Args<'a, DB> {
         self.values.push(Self::cast(v));
         self
     }
-    pub fn append(&mut self, arg: &mut Self) { // arg: &mut MySqlArgs<'a>
+    pub fn append(&mut self, arg: &mut Self) {
         self.values.append(&mut arg.values);
     }
 
@@ -105,11 +106,12 @@ pub struct Bridge<'a, DB: Database> {
 
 impl<'a> Encode<'a, MySql> for Bridge<'a, MySql> {
     fn encode_by_ref(&self, buf: &mut <MySql as HasArguments<'a>>::ArgumentBuffer) -> IsNull {
-        <&[u8] as Encode<MySql>>::encode(self.value.as_slice(), buf);
-        match self.is_null {
-            IsNull::Yes => IsNull::Yes,
-            IsNull::No => IsNull::No
-        }
+        buf.extend_from_slice(self.value.as_slice());
+        unsafe { std::mem::transmute_copy(&self.is_null) }
+        // match self.is_null {
+        //     IsNull::Yes => IsNull::Yes,
+        //     IsNull::No => IsNull::No
+        // }
     }
 
     fn produces(&self) -> Option<<MySql as Database>::TypeInfo> {

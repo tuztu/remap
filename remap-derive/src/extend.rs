@@ -37,9 +37,9 @@ pub fn derive(ast: syn::DeriveInput) -> TokenStream {
     }
 
     let token = quote!(
-        impl Remap<_db_> for #ident {
+        impl remap::extend::Remap<_db_> for #ident {
             fn table_name() -> &'static str {
-                stringify!(#table)
+                #table
             }
             fn fields_name() -> Vec<&'static str> {
                 vec![ _fields_str_ ]
