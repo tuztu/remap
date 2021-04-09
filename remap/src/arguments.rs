@@ -107,11 +107,11 @@ pub struct Bridge<'a, DB: Database> {
 impl<'a> Encode<'a, MySql> for Bridge<'a, MySql> {
     fn encode_by_ref(&self, buf: &mut <MySql as HasArguments<'a>>::ArgumentBuffer) -> IsNull {
         buf.extend_from_slice(self.value.as_slice());
-        unsafe { std::mem::transmute_copy(&self.is_null) }
-        // match self.is_null {
-        //     IsNull::Yes => IsNull::Yes,
-        //     IsNull::No => IsNull::No
-        // }
+        // unsafe { std::mem::transmute_copy(&self.is_null) }
+        match self.is_null {
+            IsNull::Yes => IsNull::Yes,
+            IsNull::No => IsNull::No
+        }
     }
 
     fn produces(&self) -> Option<<MySql as Database>::TypeInfo> {
