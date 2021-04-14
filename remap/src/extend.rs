@@ -1,7 +1,9 @@
+use crate::arguments::Args;
+
 pub trait Remap<DB: sqlx::Database>: Sized + Send + Unpin {
     fn table_name() -> &'static str;
     fn fields_name() -> Vec<&'static str>;
-    fn fields_args(&self) -> crate::arguments::Args<DB>;
+    fn fields_args(&self) -> Args<DB>;
     fn decode_row(row: DB::Row) -> Result<Self, anyhow::Error>;
 }
 
@@ -17,7 +19,7 @@ mod test {
     }
 
     #[derive(Debug, Remap)]
-    #[remap(sqlx::MySql, table = "my_user")]
+    #[remap(MySql, table = "my_user")]
     pub struct User {
         id: u32,
         name: String

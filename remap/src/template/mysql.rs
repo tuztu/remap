@@ -239,6 +239,7 @@ pub trait MySqlTemplate<S>: Debug where S: MySqlTemplate<S> {
     async fn data_source() -> Result<Vec<(S, Pool<MySql>)>, Error>;
 
     async fn init() -> Result<(), Error> {
+        if POOLS.get().is_some() { return Ok(()); }
         let data_source = Self::data_source().await?;
         let mut map = HashMap::with_capacity(data_source.len());
         for (key, value) in data_source {
@@ -289,7 +290,7 @@ mod example {
 
 
     #[derive(Debug, Remap)]
-    #[remap(sqlx::MySql, table = "user")]
+    #[remap(MySql, table = "user")]
     pub struct User {
         id: u32,
         name: String,

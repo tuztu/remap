@@ -4,52 +4,6 @@ use sqlx::database::HasArguments;
 use sqlx::encode::IsNull;
 use sqlx::mysql::{MySqlArguments, MySqlTypeInfo};
 
-/*
-pub trait Arguments<'a, DB>: Sized where DB: Database {
-    fn new() -> Self;
-    fn from<T>(v: T)  -> Self where T: 'a + Send + Encode<'a, DB> + Type<DB>;
-    fn add<T>(self, v: T) -> Self where T: 'a + Send + Encode<'a, DB> + Type<DB>;
-    // fn append(&mut self, arg: &mut A);
-    fn append(&mut self, arg: &mut Self);
-    fn cast<T>(v: T) -> Bridge<'a, DB>
-        where T: 'a + Send + Encode<'a, DB> + Type<DB>,
-              <DB as HasArguments<'a>>::ArgumentBuffer: Default {
-        let ty = v.produces().unwrap_or_else(T::type_info);
-        let compatible = T::compatible(&ty);
-        let size_hint = v.size_hint();
-        let mut buffer = Default::default();
-        let is_null = v.encode(&mut buffer);
-
-        Bridge {
-            value: buffer,
-            is_null,
-            size_hint,
-            ty,
-            compatible
-        }
-    }
-}
-
-impl<'a> Arguments<'a, MySql> for Args<'a, MySql> {
-    fn new() -> Self {
-        Args { values: vec![] }
-    }
-
-    fn from<T>(v: T) -> Self where T: 'a + Send + Encode<'a, MySql> + Type<MySql> {
-        Args { values: vec![Self::cast(v)] }
-    }
-
-    fn add<T>(mut self, v: T) -> Self where T: 'a + Send + Encode<'a, MySql> + Type<MySql> {
-        self.values.push(Self::cast(v));
-        self
-    }
-
-    fn append(&mut self, arg: &mut Self) { // arg: &mut MySqlArgs<'a>
-        self.values.append(&mut arg.values);
-    }
-}
-*/
-
 pub struct Args<'a, DB: Database> {
     pub(crate) values: Vec<Bridge<'a, DB>>
 }
