@@ -5,8 +5,10 @@ extern crate anyhow;
 #[cfg_attr(test, macro_use)]
 extern crate remap_derive;
 
-pub mod mysql;
-pub mod config;
-pub mod template;
-pub mod extend;
-pub mod arguments;
+pub use arguments::Args;
+pub use extend::Remap;
+pub use template::mysql::MySqlTemplate;
+
+pub(crate) mod template;
+pub(crate) mod extend;
+pub(crate) mod arguments;

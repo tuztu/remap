@@ -6,8 +6,8 @@ use anyhow::Error;
 use async_trait::async_trait;
 use once_cell::sync::OnceCell;
 use sql_builder::SqlBuilder;
-use sqlx::{Arguments, Database, MySql, Pool, Transaction};
-use sqlx::mysql::{MySqlArguments, MySqlQueryResult};
+use sqlx::{Arguments, Database, FromRow, MySql, Pool, Transaction};
+use sqlx::mysql::{MySqlArguments, MySqlQueryResult, MySqlRow};
 
 use crate::arguments::Args;
 use crate::extend::Remap;
@@ -17,6 +17,7 @@ static POOLS: OnceCell<HashMap<String, Pool<MySql>>> = OnceCell::new();
 
 #[async_trait]
 pub trait MySqlTemplate<S>: Debug where S: MySqlTemplate<S> {
+
     async fn insert_one<T>(&self, t: &T) -> Result<u64, Error> where T: Remap<MySql> + Sync {
         let sql = Self::build_insert_sql::<private::Local, T>(1).sql()?;
         let mut args = MySqlArguments::default();
@@ -29,7 +30,7 @@ pub trait MySqlTemplate<S>: Debug where S: MySqlTemplate<S> {
         Ok(x.rows_affected())
     }
 
-    async fn insert<'a, T>(&self, v: &Vec<&T>, tx: Option<&mut Transaction<'a, MySql>>)
+    async fn insert<'a, T>(&self, v: &[T], tx: Option<&mut Transaction<'a, MySql>>)
         -> Result<u64, Error>
         where T: Remap<MySql> + Sync {
         assert!(v.len() > 0);
@@ -53,7 +54,7 @@ pub trait MySqlTemplate<S>: Debug where S: MySqlTemplate<S> {
         // tx.commit().await?;
     }
 
-    async fn insert_ignore<'a, T>(&self, v: &Vec<&T>, tx: Option<&mut Transaction<'a, MySql>>)
+    async fn insert_ignore<'a, T>(&self, v: &[T], tx: Option<&mut Transaction<'a, MySql>>)
         -> Result<u64, Error>
         where T: Remap<MySql> + Sync {
         assert!(v.len() > 0);
@@ -71,16 +72,16 @@ pub trait MySqlTemplate<S>: Debug where S: MySqlTemplate<S> {
     // todo insert_replace
 
     async fn insert_update<'a, T>(
-        &self, v: &Vec<&T>, update_fields: &[&str], tx: Option<&mut Transaction<'a, MySql>>)
+        &self, v: &[T], fields: &[&str], tx: Option<&mut Transaction<'a, MySql>>)
         -> Result<u64, Error>
         where T: Remap<MySql> + Sync {
-        assert!(v.len() > 0 && update_fields.len() > 0);
+        assert!(v.len() > 0 && fields.len() > 0);
 
         let mut sql = Self::build_insert_sql::<private::Local, T>(v.len()).sql()?;
         sql.pop(); // remove ;   sql.remove(sql.len() - 1);   sql.replace(";", "");
 
         let mut update = String::new();
-        update_fields.iter().for_each(|x| {
+        fields.iter().for_each(|x| {
             if !update.is_empty() { update.push_str(","); }
             let s = format!("{0} = new.{0}", x);
             update.push_str(s.as_str());
@@ -175,6 +176,17 @@ pub trait MySqlTemplate<S>: Debug where S: MySqlTemplate<S> {
             vec.push(T::decode_row(row)?);
         }
         Ok(vec)
+    }
+
+    async fn select_as<'a, T>(&self, sql: &str, args: &'a Args<'a, MySql>)
+        -> Result<Vec<T>, Error>
+        where T: for<'r> FromRow<'r, MySqlRow> + Send + Unpin {
+        let mut arguments = MySqlArguments::default();
+        args.values.iter().for_each(|x| arguments.add(x) );
+        let output = sqlx::query_as_with(sql, arguments)
+            .fetch_all(self.pool())
+            .await?;
+        Ok(output)
     }
 
     async fn select<'a, T>(&self, sql: &str, args: &'a Args<'a, MySql>)
@@ -274,7 +286,7 @@ mod example {
         MySqlSource::init().await.unwrap();
         let user_1 = User { id: 1, name: "Bob".into() };
         let user_2 = User { id: 2, name: "Cat".into() };
-        let vec = vec![&user_1, &user_2];
+        let vec = [user_1, user_2];
 
         let rows = MySqlSource::Default.insert(&vec, None).await.unwrap();
         assert_eq!(2, rows);
@@ -283,7 +295,7 @@ mod example {
 
         let user_2 = User { id: 2, name: "Cow".into() };
         let user_3 = User { id: 3, name: "Dog".into() };
-        let vec = vec![&user_2, &user_3];
+        let vec = [user_2, user_3];
         let rows = MySqlSource::Default.insert_update(&vec, &["name"], None).await.unwrap();
         assert_eq!(3, rows)
     }

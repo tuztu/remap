@@ -13,6 +13,3 @@ proc-macro2 = "1.0.26"
 syn = "1.0.68"
 quote = "1.0.9"
 heck = "0.3.2"
-
-[dev-dependencies]
-named_type_derive = "0.2.2"

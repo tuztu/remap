@@ -32,15 +32,15 @@ pub fn derive(ast: syn::DeriveInput) -> TokenStream {
     ).collect::<String>();
 
     let token = quote!(
-        impl remap::extend::Remap<sqlx::_db_> for #ident {
+        impl remap::Remap<sqlx::_db_> for #ident {
             fn table_name() -> &'static str {
                 #table
             }
             fn fields_name() -> Vec<&'static str> {
                 vec![ _fields_str_ ]
             }
-            fn fields_args(&self) -> remap::arguments::Args<sqlx::_db_> {
-                remap::arguments::Args::new()_add_args_str_
+            fn fields_args(&self) -> remap::Args<sqlx::_db_> {
+                remap::Args::new()_add_args_str_
             }
             fn decode_row(row: <sqlx::_db_ as sqlx::Database>::Row) -> Result<Self, anyhow::Error> {
                 use sqlx::Row;
