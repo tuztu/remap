@@ -42,16 +42,21 @@ pub trait MySqlTemplate<S>: Debug where S: MySqlTemplate<S> {
 
         let x = self.insert_tx::<private::Local>(sql.as_str(), arguments, tx).await?;
         Ok(x.rows_affected())
+    }
 
-        // `Bug and compile failed`
-        // let tx = match tx {
-        //     Some(tx) => tx,
-        //     _ => self.pool().begin().await?.borrow_mut()
-        // };
-        // let x =  sqlx::query_with(sql.as_str(), args)
-        //     .execute(tx)
-        //     .await?;
-        // tx.commit().await?;
+    async fn insert_replace<'a, T>(&self, v: &[T], tx: Option<&mut Transaction<'a, MySql>>)
+                           -> Result<u64, Error>
+        where T: Remap<MySql> + Sync {
+        assert!(v.len() > 0);
+        let sql = Self::build_insert_sql::<private::Local, T>(v.len()).sql()?
+            .replacen("INSERT INTO", "REPLACE INTO", 1);
+        let mut arguments = MySqlArguments::default();
+        v.iter().for_each(|t| {
+            t.fields_args().values.iter().for_each(|x| arguments.add(x));
+        });
+
+        let x = self.insert_tx::<private::Local>(sql.as_str(), arguments, tx).await?;
+        Ok(x.rows_affected())
     }
 
     async fn insert_ignore<'a, T>(&self, v: &[T], tx: Option<&mut Transaction<'a, MySql>>)
@@ -68,8 +73,6 @@ pub trait MySqlTemplate<S>: Debug where S: MySqlTemplate<S> {
         let x = self.insert_tx::<private::Local>(sql.as_str(), arguments, tx).await?;
         Ok(x.rows_affected())
     }
-
-    // todo insert_replace
 
     async fn insert_update<'a, T>(
         &self, v: &[T], fields: &[&str], tx: Option<&mut Transaction<'a, MySql>>)
